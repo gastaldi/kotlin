@@ -15,9 +15,13 @@ import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.util.*
+import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodGenericSignature
 import org.jetbrains.kotlin.utils.keysToMap
+import org.jetbrains.org.objectweb.asm.MethodVisitor
+import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.commons.Method
+import org.jetbrains.org.objectweb.asm.tree.MethodNode
 
 class IrInlineCodegen(
     codegen: ExpressionCodegen,
@@ -158,6 +162,23 @@ class IrExpressionLambdaImpl(
     override val invokeMethodDescriptor: FunctionDescriptor = function.descriptor
 
     override val hasDispatchReceiver: Boolean = false
+
+    override fun generateLambdaBody(sourceCompiler: SourceCompilerForInline, reifiedTypeInliner: ReifiedTypeInliner) {
+        require(sourceCompiler is IrSourceCompilerForInline)
+        lateinit var methodNode: MethodNode
+        lateinit var methodAdapter: MethodVisitor
+        val functionCodegen = object : FunctionCodegen(function, sourceCompiler.classCodegen, true) {
+            override fun createMethod(flags: Int, signature: JvmMethodGenericSignature): MethodVisitor {
+                val asmMethod = signature.asmMethod
+                methodNode = MethodNode(Opcodes.API_VERSION, flags, asmMethod.name, asmMethod.descriptor, null, null)
+                methodAdapter = wrapWithMaxLocalCalc(methodNode)
+                return methodAdapter
+            }
+        }
+        functionCodegen.generate()
+        methodAdapter.visitMaxs(-1, -1)
+        node = SMAPAndMethodNode(methodNode, SMAP(sourceCompiler.lazySourceMapper.resultMappings))
+    }
 }
 
 fun isInlineIrExpression(argumentExpression: IrExpression) =

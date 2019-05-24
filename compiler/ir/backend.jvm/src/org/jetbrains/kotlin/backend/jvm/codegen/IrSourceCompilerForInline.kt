@@ -38,6 +38,8 @@ class IrSourceCompilerForInline(
     private val data: BlockInfo
 ) : SourceCompilerForInline {
 
+    val classCodegen: ClassCodegen
+        get() = codegen.classCodegen
 
     //TODO
     override val lookupLocation: LookupLocation
@@ -59,18 +61,8 @@ class IrSourceCompilerForInline(
     override val lazySourceMapper: DefaultSourceMapper
         get() = codegen.classCodegen.getOrCreateSourceMapper()
 
-    override fun generateLambdaBody(adapter: MethodVisitor, jvmMethodSignature: JvmMethodSignature, lambdaInfo: ExpressionLambda): SMAP {
-        lambdaInfo as? IrExpressionLambdaImpl ?: error("Expecting ir lambda, but $lambdaInfo")
-
-        val functionCodegen = object : FunctionCodegen(lambdaInfo.function, codegen.classCodegen, true) {
-            override fun createMethod(flags: Int, signature: JvmMethodGenericSignature): MethodVisitor {
-                return adapter
-            }
-        }
-        functionCodegen.generate()
-
-        return SMAP(codegen.classCodegen.getOrCreateSourceMapper().resultMappings)
-    }
+    override fun generateLambdaBody(adapter: MethodVisitor, jvmMethodSignature: JvmMethodSignature, lambdaInfo: ExpressionLambda): SMAP =
+        throw AssertionError("unreachable; IrExpressionLambdaImpl overrides generateLambdaBody")
 
     override fun doCreateMethodNodeFromSource(
         callableDescriptor: FunctionDescriptor,
